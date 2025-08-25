@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Absensi</title>
+  <style>
+    :root {
+      --bg: #0f172a;       /* slate-900 */
+      --card: #111827;     /* gray-900 */
+      --muted: #94a3b8;    /* slate-400 */
+      --text: #e5e7eb;     /* gray-200 */
+      --accent: #22c55e;   /* green-500 */
+      --accent-2: #f59e0b; /* amber-500 */
+      --border: #1f2937;   /* gray-800 */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 20% -10%, #0b1220, var(--bg));
+      color: var(--text);
+    }
+    .wrap { max-width: 800px; margin: 48px auto; padding: 0 16px; }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      backdrop-filter: blur(6px);
+    }
+    h1 {
+      margin: 0 0 8px; font-size: 28px; letter-spacing: .3px;
+    }
+    .sub { color: var(--muted); margin-bottom: 18px; font-size: 14px; }
+
+    .toolbar { display:flex; flex-wrap:wrap; gap: 10px; align-items:center; margin: 14px 0 18px; }
+    .toolbar input[type="date"] { background:#0b1220; color:var(--text); border:1px solid var(--border); padding:8px 10px; border-radius:10px; }
+
+    button {
+      appearance: none; border:1px solid var(--border); background:#0b1220;
+      color:var(--text); padding:10px 12px; border-radius:12px; cursor:pointer;
+      transition: transform .04s ease, background .2s ease, border-color .2s ease;
+    }
+    button:hover { background:#0a0f1c; border-color:#273244; }
+    button:active { transform: translateY(1px); }
+    .btn-accent { background: rgba(34,197,94,.15); border-color: rgba(34,197,94,.35); }
+    .btn-warn { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.35); }
+
+    .table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 12px; }
+    .table thead th {
+      text-align: left; padding: 12px; font-weight: 600; font-size: 14px; color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+    .table tbody td { padding: 12px; border-bottom: 1px dashed var(--border); }
+    .row:hover { background: rgba(255,255,255,0.02); }
+    .name { font-weight: 600; }
+    .status { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; color: var(--muted); }
+    .footer {
+      display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-top:14px;
+      padding-top:12px; border-top:1px solid var(--border);
+    }
+    .count { display:flex; gap:12px; align-items:center; }
+    .pill { padding:6px 10px; border-radius:999px; border:1px solid var(--border); }
+    .pill.ok { background: rgba(34,197,94,.1); border-color: rgba(34,197,94,.35); }
+    .pill.no { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.35); }
+    .small { font-size: 12px; color: var(--muted); }
+    .hide-print { }
+    @media print {
+      body { background: #fff; color:#111; }
+      .card { box-shadow:none; border:1px solid #ddd; }
+      .hide-print { display:none !important; }
+      .sub { color:#444; }
+      .table thead th { color:#333; background:#f8f8f8; }
+      .status { color:#555; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Absensi</h1>
+      <div class="sub">Centang (✔) untuk menandai <em>Hadir</em>. Simpanan otomatis di browser Anda.</div>
+
+      <div class="toolbar">
+        <label class="small">Tanggal: <input id="tanggal" type="date"></label>
+        <button id="btnSemuaHadir" class="btn-accent hide-print">Semua Hadir</button>
+        <button id="btnKosongkan" class="btn-warn hide-print">Kosongkan</button>
+        <button id="btnSimpan" class="hide-print">Simpan</button>
+        <button id="btnReset" class="hide-print">Reset Data</button>
+        <button id="btnPrint" class="hide-print">Cetak</button>
+        <button id="btnCSV" class="hide-print">Unduh CSV</button>
+      </div>
+
+      <table class="table" aria-label="Tabel Absensi">
+        <thead>
+          <tr>
+            <th style="width:56px">No</th>
+            <th>Nama</th>
+            <th style="width:120px">Hadir</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <!-- Baris di-injeksi via JS -->
+        </tbody>
+      </table>
+
+      <div class="footer">
+        <div class="count">
+          <div class="pill ok">Hadir: <span id="jmlHadir">0</span></div>
+          <div class="pill no">Tidak Hadir: <span id="jmlTidak">0</span></div>
+          <div class="pill">Total: <span id="jmlTotal">0</span></div>
+        </div>
+        <div class="small">Tips: tekan <strong>Ctrl+P</strong> untuk mencetak.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const NAMA = [
+      "Ghifar","Farhan","Roja","Musa","Irham","Gavin",
+      "Reysa","Vino","Ahza","Daffa","Sauqi","Imran"
+    ];
+
+    const tbody = document.getElementById('tbody');
+    const jmlHadir = document.getElementById('jmlHadir');
+    const jmlTidak = document.getElementById('jmlTidak');
+    const jmlTotal = document.getElementById('jmlTotal');
+    const tanggal = document.getElementById('tanggal');
+
+    const STORAGE_KEY = 'absensi_data_v1';
+
+    function loadSaved() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : { date: todayISO(), rows: {} };
+      } catch(e) { return { date: todayISO(), rows: {} }; }
+    }
+
+    function todayISO() {
+      const d = new Date();
+      const tzOffset = d.getTimezoneOffset();
+      const local = new Date(d.getTime() - tzOffset*60000);
+      return local.toISOString().slice(0,10);
+    }
+
+    const state = loadSaved();
+
+    function render() {
+      tbody.innerHTML = '';
+      NAMA.forEach((n, i) => {
+        const id = `row-${i}`;
+        const row = document.createElement('tr');
+        row.className = 'row';
+
+        const saved = state.rows[id] || { hadir:false, ket:'' };
+
+        row.innerHTML = `
+          <td>${i+1}</td>
+          <td class="name">${n}</td>
+          <td style="text-align:center">
+            <input type="checkbox" id="${id}-cb" ${saved.hadir? 'checked':''} aria-label="Hadir untuk ${n}">
+          </td>
+          <td>
+            <input type="text" id="${id}-ket" placeholder="Catatan (opsional)" value="${saved.ket?.replaceAll('"','&quot;') || ''}" style="width:100%; background:#0b1220; color:var(--text); border:1px solid var(--border); padding:8px 10px; border-radius:10px;" />
+          </td>`;
+
+        tbody.appendChild(row);
+
+        // Listeners
+        row.querySelector(`#${id}-cb`).addEventListener('change', updateCounts);
+        row.querySelector(`#${id}-ket`).addEventListener('input', debounce(save, 300));
+      });
+
+      tanggal.value = state.date || todayISO();
+      updateCounts();
+    }
+
+    function updateCounts() {
+      let hadir = 0;
+      const rows = {};
+      NAMA.forEach((_, i) => {
+        const id = `row-${i}`;
+        const cb = document.getElementById(`${id}-cb`);
+        const ket = document.getElementById(`${id}-ket`);
+        if (cb?.checked) hadir++;
+        rows[id] = { hadir: !!cb?.checked, ket: ket?.value || '' };
+      });
+      jmlHadir.textContent = hadir;
+      jmlTotal.textContent = NAMA.length;
+      jmlTidak.textContent = NAMA.length - hadir;
+      state.rows = rows;
+      state.date = tanggal.value || todayISO();
+      // autosave lightweight
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function save() {
+      updateCounts();
+      alert('Disimpan ke perangkat Anda (localStorage).');
+    }
+
+    function resetAll() {
+      if (!confirm('Hapus semua data tersimpan?')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      state.date = todayISO();
+      state.rows = {};
+      render();
+    }
+
+    function setAll(val) {
+      NAMA.forEach((_, i) => {
+        const id = `row-${i}`;
+        const cb = document.getElementById(`${id}-cb`);
+        if (cb) cb.checked = val;
+      });
+      updateCounts();
+    }
+
+    function toCSV() {
+      const header = ['Tanggal','No','Nama','Hadir','Keterangan'];
+      const rows = [];
+      NAMA.forEach((n, i) => {
+        const id = `row-${i}`;
+        const cb = document.getElementById(`${id}-cb`);
+        const ket = document.getElementById(`${id}-ket`);
+        rows.push([tanggal.value, i+1, n, cb?.checked ? 'Hadir' : 'Tidak', (ket?.value||'').replaceAll('"','""')]);
+      });
+      let csv = header.join(',')+'\n';
+      rows.forEach(r => { csv += r.map(v => /[",\n]/.test(String(v)) ? `"${String(v)}"` : String(v)).join(',') + '\n'; });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `absensi_${tanggal.value}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    // Utilities
+    function debounce(fn, t=300){ let id; return (...a)=>{ clearTimeout(id); id=setTimeout(()=>fn.apply(this,a), t); } }
+
+    // Bind buttons
+    document.getElementById('btnSemuaHadir').addEventListener('click', () => setAll(true));
+    document.getElementById('btnKosongkan').addEventListener('click', () => setAll(false));
+    document.getElementById('btnSimpan').addEventListener('click', save);
+    document.getElementById('btnReset').addEventListener('click', resetAll);
+    document.getElementById('btnPrint').addEventListener('click', () => window.print());
+    document.getElementById('btnCSV').addEventListener('click', toCSV);
+
+    tanggal.addEventListener('change', updateCounts);
+
+    // Init
+    render();
+  </script>
+</body>
+</html>
